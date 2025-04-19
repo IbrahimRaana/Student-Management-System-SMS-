@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 # ================================
 # Student Management System (SMS)
 # ================================
@@ -61,13 +61,38 @@ authenticate_student() {
 
 # ======= Add Student =======
 add_student() {
-    read -p "Enter Roll Number: " roll
-    read -p "Enter Name: " name
-    read -p "Enter Total Marks (0-100): " marks
+    while true; do
+        read -p "Enter Roll Number: " roll
+        if ! [[ "$roll" =~ ^[a-zA-Z0-9]+$ ]]; then
+            echo "Invalid Roll Number. Alphanumeric only."
+            continue
+        elif grep -q "^$roll," "$DATA_FILE"; then
+            echo "Roll number already exists!"
+            continue
+        fi
+        break
+    done
+
+    while true; do
+        read -p "Enter Name: " name
+        if ! [[ "$name" =~ ^[a-zA-Z\s]+$ ]]; then
+            echo "Invalid name. Only letters and spaces allowed."
+            continue
+        fi
+        break
+    done
+
+    while true; do
+        read -p "Enter Total Marks (0-100): " marks
+        if ! [[ "$marks" =~ ^[0-9]+$ ]] || [ "$marks" -lt 0 ] || [ "$marks" -gt 100 ]; then
+            echo "Invalid marks. Enter a number between 0 and 100."
+            continue
+        fi
+        break
+    done
 
     cgpa=$(echo "scale=2; $marks / 25" | bc)
     grade="F"
-
     if [ "$marks" -ge 90 ]; then grade="A+"; cgpa=4.0
     elif [ "$marks" -ge 80 ]; then grade="A"; cgpa=3.7
     elif [ "$marks" -ge 75 ]; then grade="B+"; cgpa=3.3
@@ -84,7 +109,7 @@ add_student() {
     echo "Student added successfully!"
 }
 
-# ======= View Student=======
+# ======= View Student (by roll) =======
 view_student() {
     read -p "Enter Roll Number: " roll
     display_student "$roll"
@@ -112,14 +137,25 @@ delete_student() {
     echo "Student deleted."
 }
 
-# ======= Assign or Update Marks =======
+# ======= Assign/Update Marks =======
 assign_marks() {
     read -p "Enter Roll Number: " roll
-    read -p "Enter New Marks: " marks
+    if ! grep -q "^$roll," "$DATA_FILE"; then
+        echo "Student not found!"
+        return
+    fi
+
+    while true; do
+        read -p "Enter New Marks (0-100): " marks
+        if ! [[ "$marks" =~ ^[0-9]+$ ]] || [ "$marks" -lt 0 ] || [ "$marks" -gt 100 ]; then
+            echo "Invalid marks. Enter a number between 0 and 100."
+            continue
+        fi
+        break
+    done
 
     cgpa=$(echo "scale=2; $marks / 25" | bc)
     grade="F"
-   
     if [ "$marks" -ge 90 ]; then grade="A+"; cgpa=4.0
     elif [ "$marks" -ge 80 ]; then grade="A"; cgpa=3.7
     elif [ "$marks" -ge 75 ]; then grade="B+"; cgpa=3.3
@@ -131,12 +167,11 @@ assign_marks() {
     elif [ "$marks" -ge 45 ]; then grade="D"; cgpa=1.0
     fi
 
-    awk -F',' -v r="$roll" -v m="$marks" -v c="$cgpa" -v g="$grade" 'BEGIN{OFS=","}
-        $1==r{$3=m; $4=c; $5=g} {print}' "$DATA_FILE" > temp.txt && mv temp.txt "$DATA_FILE"
+    awk -F',' -v r="$roll" -v m="$marks" -v c="$cgpa" -v g="$grade" 'BEGIN{OFS=","} $1==r{$3=m; $4=c; $5=g} {print}' "$DATA_FILE" > temp.txt && mv temp.txt "$DATA_FILE"
     echo "Marks updated successfully."
 }
 
-# ======= Calculating grades =======
+# ======= Calculate Grades for All =======
 calculate_grades() {
     awk -F',' 'BEGIN{OFS=","}
     {
@@ -150,13 +185,15 @@ calculate_grades() {
         else if ($3 >= 55) {grade="C-"; cgpa=1.7}
         else if ($3 >= 50) {grade="D+"; cgpa=1.33}
         else if ($3 >= 45) {grade="D"; cgpa=1.0}
-        $4 = sprintf("%.2f", $cgpa)
-        print $1, $2, $3, $4, grade
+        else {cgpa=0.0}
+        $4 = sprintf("%.2f", cgpa)
+        $5 = grade
+        print $1, $2, $3, $4, $5
     }' "$DATA_FILE" > temp.txt && mv temp.txt "$DATA_FILE"
     echo "Grades recalculated for all students."
 }
 
-# ======= Sort Students by CGPA =======
+# ======= Sorting Students by CGPA =======
 sort_students() {
     echo "1. Ascending Order"
     echo "2. Descending Order"
@@ -169,7 +206,7 @@ sort_students() {
     fi
 }
 
-# ======= List of Passed  or Failed =======
+# ======= List of Passed or Failed =======
 list_pass_fail() {
     echo "1. Passed Students"
     echo "2. Failed Students"
